@@ -31,5 +31,5 @@ namespace gc {
     // reescribe URLs oficiales -> servidor activo
     bool rewriteUrl(std::string const& in, std::string& out);
 
-    geode::utils::web::WebTask post(GdpsServer const& s, std::string const& endpoint, std::string const& body);
+    geode::utils::web::WebFuture post(GdpsServer const& s, std::string const& endpoint, std::string const& body);
 }
