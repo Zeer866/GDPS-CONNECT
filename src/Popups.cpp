@@ -7,7 +7,7 @@ using namespace geode::prelude;
 
 StatsPopup* StatsPopup::create(GdpsServer const& s) {
     auto ret = new StatsPopup();
-    if (ret->initAnchored(320.f, 250.f, s)) {
+    if (ret->init(s)) {
         ret->autorelease();
         return ret;
     }
@@ -15,7 +15,8 @@ StatsPopup* StatsPopup::create(GdpsServer const& s) {
     return nullptr;
 }
 
-bool StatsPopup::setup(GdpsServer const& s) {
+bool StatsPopup::init(GdpsServer const& s) {
+    if (!Popup::init(320.f, 250.f)) return false;
     m_server = s;
     setTitle(("Stats: " + s.name).c_str());
     auto size = m_mainLayer->getContentSize();
@@ -40,13 +41,15 @@ bool StatsPopup::setup(GdpsServer const& s) {
     auto start = std::chrono::steady_clock::now();
 
     // Ping + total de niveles
-    m_pingListener.bind([this, start](web::WebTask::Event* e) {
-        if (auto res = e->getValue()) {
-            if (res->ok()) {
+    m_pingListener.spawn(
+        gc::post(s, "getGJLevels21.php",
+            "gameVersion=" + gvs + "&binaryVersion=45&type=4&str=&diff=-&len=-&page=0&total=0&secret=Wmfd2893gb7"),
+        [this, start](web::WebResponse res) {
+            if (res.ok()) {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count();
                 m_ping = std::to_string(ms) + " ms";
                 m_status = "En linea";
-                auto str = res->string().unwrapOr("");
+                std::string str = res.string().unwrapOr("");
                 auto parts = gc::split(str, '#');
                 m_total = "?";
                 if (parts.size() > 3) {
@@ -54,24 +57,20 @@ bool StatsPopup::setup(GdpsServer const& s) {
                     if (!pg.empty() && !pg[0].empty()) m_total = pg[0];
                 }
             } else {
-                m_status = "Error HTTP " + std::to_string(res->code());
+                m_status = "Error HTTP " + std::to_string(res.code());
                 m_ping = "-";
                 m_total = "-";
             }
             render();
-        } else if (e->isCancelled()) {
-            m_status = "Cancelado";
-            render();
-        }
-    });
-    m_pingListener.setFilter(gc::post(s, "getGJLevels21.php",
-        "gameVersion=" + gvs + "&binaryVersion=45&type=4&str=&diff=-&len=-&page=0&total=0&secret=Wmfd2893gb7"));
+        });
 
     // Top de jugadores
-    m_topListener.bind([this](web::WebTask::Event* e) {
-        if (auto res = e->getValue()) {
-            if (!res->ok()) { m_top = "No disponible"; render(); return; }
-            auto str = res->string().unwrapOr("");
+    m_topListener.spawn(
+        gc::post(s, "getGJScores20.php",
+            "gameVersion=" + gvs + "&binaryVersion=45&type=top&count=5&secret=Wmfd2893gb7"),
+        [this](web::WebResponse res) {
+            if (!res.ok()) { m_top = "No disponible"; render(); return; }
+            std::string str = res.string().unwrapOr("");
             std::string out;
             int rank = 1;
             for (auto& entry : gc::split(str, '|')) {
@@ -88,10 +87,7 @@ bool StatsPopup::setup(GdpsServer const& s) {
             }
             m_top = out.empty() ? "Sin datos" : out;
             render();
-        }
-    });
-    m_topListener.setFilter(gc::post(s, "getGJScores20.php",
-        "gameVersion=" + gvs + "&binaryVersion=45&type=top&count=5&secret=Wmfd2893gb7"));
+        });
 
     render();
     return true;
@@ -114,7 +110,7 @@ void StatsPopup::onDashboard(CCObject*) {
 
 AddPopup* AddPopup::create(std::function<void()> done) {
     auto ret = new AddPopup();
-    if (ret->initAnchored(320.f, 260.f, done)) {
+    if (ret->init(done)) {
         ret->autorelease();
         return ret;
     }
@@ -122,7 +118,8 @@ AddPopup* AddPopup::create(std::function<void()> done) {
     return nullptr;
 }
 
-bool AddPopup::setup(std::function<void()> done) {
+bool AddPopup::init(std::function<void()> done) {
+    if (!Popup::init(320.f, 260.f)) return false;
     m_done = done;
     setTitle("Anadir servidor");
     auto size = m_mainLayer->getContentSize();
@@ -179,7 +176,7 @@ void AddPopup::onSave(CCObject*) {
 
 ConnectPopup* ConnectPopup::create() {
     auto ret = new ConnectPopup();
-    if (ret->initAnchored(380.f, 270.f)) {
+    if (ret->init()) {
         ret->autorelease();
         return ret;
     }
@@ -187,7 +184,8 @@ ConnectPopup* ConnectPopup::create() {
     return nullptr;
 }
 
-bool ConnectPopup::setup() {
+bool ConnectPopup::init() {
+    if (!Popup::init(380.f, 270.f)) return false;
     setTitle("GDPS Connect");
     auto size = m_mainLayer->getContentSize();
 
@@ -281,20 +279,19 @@ void ConnectPopup::onConnect(CCObject* sender) {
     // Comprueba que el servidor responda antes de cambiar
     Notification::create("Comprobando " + s.name + "...", NotificationIcon::Loading, 1.5f)->show();
     std::string gvs = s.legacy19 ? "19" : "22";
-    m_checkListener.bind([this, s](web::WebTask::Event* e) {
-        if (auto res = e->getValue()) {
-            if (res->ok()) {
+    m_checkListener.spawn(
+        gc::post(s, "getGJLevels21.php",
+            "gameVersion=" + gvs + "&binaryVersion=45&type=4&str=&diff=-&len=-&page=0&total=0&secret=Wmfd2893gb7"),
+        [this, s](web::WebResponse res) {
+            if (res.ok()) {
                 doConnect(s);
             } else {
                 createQuickPopup("Sin respuesta",
-                    "El servidor no respondio bien (HTTP " + std::to_string(res->code()) + ").\n<cy>Conectar igualmente?</c>",
+                    "El servidor no respondio bien (HTTP " + std::to_string(res.code()) + ").\n<cy>Conectar igualmente?</c>",
                     "Cancelar", "Conectar",
                     [this, s](FLAlertLayer*, bool yes) { if (yes) doConnect(s); });
             }
-        }
-    });
-    m_checkListener.setFilter(gc::post(s, "getGJLevels21.php",
-        "gameVersion=" + gvs + "&binaryVersion=45&type=4&str=&diff=-&len=-&page=0&total=0&secret=Wmfd2893gb7"));
+        });
 }
 
 void ConnectPopup::onStats(CCObject* sender) {
