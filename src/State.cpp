@@ -156,11 +156,11 @@ bool gc::rewriteUrl(std::string const& in, std::string& out) {
     return false;
 }
 
-web::WebTask gc::post(GdpsServer const& s, std::string const& endpoint, std::string const& body) {
+web::WebFuture gc::post(GdpsServer const& s, std::string const& endpoint, std::string const& body) {
     web::WebRequest req;
     req.userAgent("");
     req.header("Content-Type", "application/x-www-form-urlencoded");
     req.bodyString(body);
-    req.timeout(std::chrono::seconds(10));
-    return req.post(s.url + "/" + endpoint);
+    std::string full = s.url + "/" + endpoint;
+    return req.post(full);
 }
