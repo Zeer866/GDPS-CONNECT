@@ -1,0 +1,78 @@
+#include <Geode/Geode.hpp>
+#include <Geode/modify/CCHttpClient.hpp>
+#include <Geode/modify/MenuLayer.hpp>
+#include "State.hpp"
+#include "Popups.hpp"
+
+using namespace geode::prelude;
+
+$on_mod(Loaded) {
+    gc::restore();
+}
+
+// Redirige las peticiones oficiales (boomlings.com/database) al servidor activo.
+class $modify(GCHttpClient, CCHttpClient) {
+    void send(CCHttpRequest* req) {
+        if (req && gc::isActive()) {
+            std::string url = req->getUrl() ? req->getUrl() : "";
+            std::string out;
+            if (gc::rewriteUrl(url, out)) {
+                req->setUrl(out.c_str());
+
+                // Modo compatibilidad 1.9: anuncia gameVersion=19
+                if (gc::active().legacy19) {
+                    auto data = req->getRequestData();
+                    auto size = req->getRequestDataSize();
+                    if (data && size > 0) {
+                        std::string body(data, size);
+                        std::string from = "gameVersion=22";
+                        auto pos = body.find(from);
+                        if (pos != std::string::npos) {
+                            body.replace(pos, from.size(), "gameVersion=19");
+                            req->setRequestData(body.c_str(), body.size());
+                        }
+                    }
+                }
+            }
+        }
+        CCHttpClient::send(req);
+    }
+};
+
+class $modify(GCMenu, MenuLayer) {
+    bool init() {
+        if (!MenuLayer::init()) return false;
+
+        static bool toastShown = false;
+        if (!toastShown) {
+            toastShown = true;
+            if (gc::isActive()) {
+                Notification::create("GDPS Connect: " + gc::activeName(), NotificationIcon::Success, 2.5f)->show();
+            }
+        }
+
+        if (!Mod::get()->getSettingValue<bool>("show-button")) return true;
+
+        auto spr = CCSprite::create("gc-logo.png"_spr);
+        if (!spr) return true;
+        spr->setScale(40.f / spr->getContentHeight());
+
+        auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(GCMenu::onGC));
+        btn->setID("gdps-connect-button"_spr);
+
+        if (auto menu = this->getChildByID("bottom-menu")) {
+            menu->addChild(btn);
+            menu->updateLayout();
+        } else {
+            auto menu = CCMenu::create();
+            menu->setPosition({40.f, 40.f});
+            menu->addChild(btn);
+            this->addChild(menu);
+        }
+        return true;
+    }
+
+    void onGC(CCObject*) {
+        ConnectPopup::create()->show();
+    }
+};
