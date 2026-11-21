@@ -1,0 +1,29 @@
+{
+	"geode": "5.11.2",
+	"gd": {
+		"win": "2.2081",
+		"android": "2.2081"
+	},
+	"id": "zeer866.gdpsconnect",
+	"name": "GDPS Connect",
+	"version": "v1.0.0",
+	"developer": "Zeer866",
+	"description": "Conecta a tu GDPS (o a cualquiera) con un toque, con dashboard y estadisticas.",
+	"resources": {
+		"sprites": ["resources/*.png"]
+	},
+	"settings": {
+		"auto-connect": {
+			"type": "bool",
+			"name": "Conectar automaticamente",
+			"description": "Al abrir el juego se reconecta al ultimo servidor usado.",
+			"default": true
+		},
+		"show-button": {
+			"type": "bool",
+			"name": "Boton en el menu principal",
+			"description": "Muestra el boton de GDPS Connect en el menu inferior.",
+			"default": true
+		}
+	}
+}
