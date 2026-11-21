@@ -60,14 +60,14 @@ class $modify(GCMenu, MenuLayer) {
         auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(GCMenu::onGC));
         btn->setID("gdps-connect-button"_spr);
 
-        if (auto menu = this->getChildByID("bottom-menu")) {
-            menu->addChild(btn);
-            menu->updateLayout();
+        if (auto bottom = this->getChildByID("bottom-menu")) {
+            bottom->addChild(btn);
+            bottom->updateLayout();
         } else {
-            auto menu = CCMenu::create();
-            menu->setPosition({40.f, 40.f});
-            menu->addChild(btn);
-            this->addChild(menu);
+            auto fallback = CCMenu::create();
+            fallback->setPosition({40.f, 40.f});
+            fallback->addChild(btn);
+            this->addChild(fallback);
         }
         return true;
     }
