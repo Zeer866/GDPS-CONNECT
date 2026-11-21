@@ -1,27 +1,29 @@
 #pragma once
 #include <Geode/Geode.hpp>
 #include <Geode/utils/web.hpp>
+#include <Geode/utils/async.hpp>
+#include <functional>
 #include "State.hpp"
 
-class StatsPopup : public geode::Popup<GdpsServer const&> {
+class StatsPopup : public geode::Popup {
 protected:
     GdpsServer m_server;
     cocos2d::CCLabelBMFont* m_info = nullptr;
-    geode::EventListener<geode::utils::web::WebTask> m_pingListener;
-    geode::EventListener<geode::utils::web::WebTask> m_topListener;
+    geode::async::TaskHolder<geode::utils::web::WebResponse> m_pingListener;
+    geode::async::TaskHolder<geode::utils::web::WebResponse> m_topListener;
     std::string m_ping = "...";
     std::string m_total = "...";
     std::string m_status = "Comprobando...";
     std::string m_top = "...";
 
-    bool setup(GdpsServer const& s) override;
+    bool init(GdpsServer const& s);
     void render();
     void onDashboard(cocos2d::CCObject*);
 public:
     static StatsPopup* create(GdpsServer const& s);
 };
 
-class AddPopup : public geode::Popup<std::function<void()>> {
+class AddPopup : public geode::Popup {
 protected:
     std::function<void()> m_done;
     geode::TextInput* m_name = nullptr;
@@ -29,20 +31,20 @@ protected:
     geode::TextInput* m_dash = nullptr;
     CCMenuItemToggler* m_legacy = nullptr;
 
-    bool setup(std::function<void()> done) override;
+    bool init(std::function<void()> done);
     void onSave(cocos2d::CCObject*);
 public:
     static AddPopup* create(std::function<void()> done);
 };
 
-class ConnectPopup : public geode::Popup<> {
+class ConnectPopup : public geode::Popup {
 protected:
     cocos2d::CCLabelBMFont* m_status = nullptr;
     geode::ScrollLayer* m_scroll = nullptr;
     std::vector<GdpsServer> m_servers;
-    geode::EventListener<geode::utils::web::WebTask> m_checkListener;
+    geode::async::TaskHolder<geode::utils::web::WebResponse> m_checkListener;
 
-    bool setup() override;
+    bool init();
     void refresh();
     void doConnect(GdpsServer const& s);
     void onConnect(cocos2d::CCObject*);
