@@ -3,7 +3,6 @@
 #include <Geode/modify/MenuLayer.hpp>
 #include "State.hpp"
 #include "Popups.hpp"
-#include "Logo.hpp"
 
 using namespace geode::prelude;
 
@@ -54,13 +53,8 @@ class $modify(GCMenu, MenuLayer) {
 
         if (!Mod::get()->getSettingValue<bool>("show-button")) return true;
 
-        CCNode* icon = nullptr;
-        if (auto logo = gcLogoSprite()) {
-            logo->setScale(40.f / logo->getContentHeight());
-            icon = logo;
-        } else {
-            icon = ButtonSprite::create("GDPS", 40, true, "bigFont.fnt", "GJ_button_01.png", 28.f, 0.6f);
-        }
+        // Boton con texto "GDPS" (no usa imagenes propias)
+        auto icon = ButtonSprite::create("GDPS", 50, true, "bigFont.fnt", "GJ_button_01.png", 30.f, 0.7f);
 
         auto btn = CCMenuItemSpriteExtra::create(icon, this, menu_selector(GCMenu::onGC));
         btn->setID("gdps-connect-button"_spr);
