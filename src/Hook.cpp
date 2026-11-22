@@ -53,11 +53,10 @@ class $modify(GCMenu, MenuLayer) {
 
         if (!Mod::get()->getSettingValue<bool>("show-button")) return true;
 
-        auto spr = CCSprite::create("gc-logo.png"_spr);
-        if (!spr) return true;
-        spr->setScale(40.f / spr->getContentHeight());
+        // Boton con texto "GDPS" (no usa imagenes propias)
+        auto icon = ButtonSprite::create("GDPS", 50, true, "bigFont.fnt", "GJ_button_01.png", 30.f, 0.7f);
 
-        auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(GCMenu::onGC));
+        auto btn = CCMenuItemSpriteExtra::create(icon, this, menu_selector(GCMenu::onGC));
         btn->setID("gdps-connect-button"_spr);
 
         if (auto bottom = this->getChildByID("bottom-menu")) {
