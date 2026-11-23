@@ -6,6 +6,7 @@
 using namespace geode::prelude;
 
 static std::optional<GdpsServer> s_active;
+static int s_redirects = 0;
 
 static std::string trim(std::string s) {
     auto notSpace = [](unsigned char c) { return !std::isspace(c); };
@@ -38,6 +39,23 @@ std::string gc::normalizeUrl(std::string url) {
     return url;
 }
 
+std::string gc::versionLabel(int gv) {
+    switch (gv) {
+        case 22: return "2.2";
+        case 19: return "1.9";
+        case 14: return "1.4";
+        default: return std::to_string(gv);
+    }
+}
+
+int gc::parseVersion(std::string const& text) {
+    std::string t = trim(text);
+    if (t == "2.2" || t == "22") return 22;
+    if (t == "1.9" || t == "19") return 19;
+    if (t == "1.4" || t == "14") return 14;
+    return 0;
+}
+
 std::string gc::dashboardUrl(GdpsServer const& s) {
     if (!s.dashboard.empty()) return s.dashboard;
     auto p = s.url.find("://");
@@ -64,7 +82,15 @@ std::vector<GdpsServer> gc::loadServers() {
         s.name = f[0];
         s.url = f[1];
         if (f.size() > 2) s.dashboard = f[2];
-        if (f.size() > 3) s.legacy19 = f[3] == "1";
+        if (f.size() > 3) {
+            // compatibilidad con versiones guardadas antes: "0" = 2.2, "1" = 1.9
+            if (f[3] == "0") s.gameVersion = 22;
+            else if (f[3] == "1") s.gameVersion = 19;
+            else {
+                int v = parseVersion(f[3]);
+                s.gameVersion = v ? v : 22;
+            }
+        }
         out.push_back(s);
     }
     return out;
@@ -73,7 +99,7 @@ std::vector<GdpsServer> gc::loadServers() {
 void gc::saveServers(std::vector<GdpsServer> const& list) {
     std::string raw;
     for (auto& s : list) {
-        raw += clean(s.name) + "\t" + clean(s.url) + "\t" + clean(s.dashboard) + "\t" + (s.legacy19 ? "1" : "0") + "\n";
+        raw += clean(s.name) + "\t" + clean(s.url) + "\t" + clean(s.dashboard) + "\t" + std::to_string(s.gameVersion) + "\n";
     }
     Mod::get()->setSavedValue<std::string>("servers", raw);
 }
@@ -101,20 +127,15 @@ void gc::removeServer(std::string const& name) {
 
 void gc::restore() {
     auto mod = Mod::get();
-    bool firstRun = !mod->hasSavedValue("servers");
-    auto list = loadServers(); // siembra los defaults si es la primera vez
+    loadServers(); // siembra la lista la primera vez (sin conectar a nada)
 
-    if (firstRun && !list.empty()) {
-        setActive(list.front());
-        return;
-    }
     if (!mod->getSettingValue<bool>("auto-connect")) {
         disconnect();
         return;
     }
     auto name = mod->getSavedValue<std::string>("active-name", "");
     if (name.empty()) return;
-    for (auto& s : list) {
+    for (auto& s : loadServers()) {
         if (s.name == name) { s_active = s; return; }
     }
 }
@@ -138,6 +159,8 @@ void gc::disconnect() {
     Mod::get()->setSavedValue<std::string>("active-name", "");
 }
 
+int gc::redirectCount() { return s_redirects; }
+
 bool gc::rewriteUrl(std::string const& in, std::string& out) {
     if (!s_active) return false;
     static const char* prefixes[] = {
@@ -150,6 +173,7 @@ bool gc::rewriteUrl(std::string const& in, std::string& out) {
         std::string pre = p;
         if (in.rfind(pre, 0) == 0) {
             out = s_active->url + in.substr(pre.size());
+            s_redirects++;
             return true;
         }
     }
