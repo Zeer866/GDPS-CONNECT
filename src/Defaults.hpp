@@ -5,6 +5,6 @@
 // EDITA la URL: debe ser la carpeta donde estan tus .php (getGJLevels21.php, etc.), sin "/" al final.
 inline std::vector<GdpsServer> gcDefaultServers() {
     return {
-        {"ZeerGDPS", "https://zeergdps.ps.fhgdps.com/", "https://zeergdps.ps.fhgdps.com/dashboard/", false},
+        {"ZeerGDPS", "https://zeergdps.ps.fhgdps.com/", "https://zeergdps.ps.fhgdps.com/dashboard/", 22},
     };
 }
