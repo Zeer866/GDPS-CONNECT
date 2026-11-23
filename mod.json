@@ -6,7 +6,7 @@
 	},
 	"id": "zeer866.gdpsconnect",
 	"name": "GDPS Connect",
-	"version": "v1.0.1",
+	"version": "v1.1.0",
 	"developer": "Zeer866",
 	"description": "Conecta a tu GDPS (o a cualquiera) con un toque, con dashboard y estadisticas.",
 	"settings": {
