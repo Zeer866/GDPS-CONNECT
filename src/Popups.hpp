@@ -29,7 +29,10 @@ protected:
     geode::TextInput* m_name = nullptr;
     geode::TextInput* m_url = nullptr;
     geode::TextInput* m_dash = nullptr;
-    CCMenuItemToggler* m_legacy = nullptr;
+    int m_ver = 22;
+    cocos2d::CCLabelBMFont* m_verLabel = nullptr;
+    void updateVerLabel();
+    void onCycleVersion(cocos2d::CCObject*);
 
     bool init(std::function<void()> done);
     void onSave(cocos2d::CCObject*);
@@ -40,12 +43,14 @@ public:
 class ConnectPopup : public geode::Popup {
 protected:
     cocos2d::CCLabelBMFont* m_status = nullptr;
+    cocos2d::CCLabelBMFont* m_info = nullptr;
     geode::ScrollLayer* m_scroll = nullptr;
     std::vector<GdpsServer> m_servers;
-    geode::async::TaskHolder<geode::utils::web::WebResponse> m_checkListener;
 
     bool init();
     void refresh();
+    void updateStatus(float);
+    void probe(GdpsServer s, std::vector<std::string> candidates, size_t idx);
     void doConnect(GdpsServer const& s);
     void onConnect(cocos2d::CCObject*);
     void onStats(cocos2d::CCObject*);
