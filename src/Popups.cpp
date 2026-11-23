@@ -36,7 +36,7 @@ bool StatsPopup::init(GdpsServer const& s) {
     btn->setPosition({size.width / 2, 28.f});
     menu->addChild(btn);
 
-    int gv = s.legacy19 ? 19 : 22;
+    int gv = s.gameVersion;
     std::string gvs = std::to_string(gv);
     auto start = std::chrono::steady_clock::now();
 
@@ -141,14 +141,18 @@ bool AddPopup::init(std::function<void()> done) {
     menu->setPosition({0.f, 0.f});
     m_mainLayer->addChild(menu);
 
-    m_legacy = CCMenuItemToggler::createWithStandardSprites(this, nullptr, 0.6f);
-    m_legacy->setPosition({40.f, 62.f});
-    menu->addChild(m_legacy);
-    auto lbl = CCLabelBMFont::create("Modo compatibilidad 1.9", "bigFont.fnt");
-    lbl->setScale(0.4f);
-    lbl->setAnchorPoint({0.f, 0.5f});
-    lbl->setPosition({62.f, 62.f});
-    m_mainLayer->addChild(lbl);
+    // Selector de version del servidor (2.2 -> 1.9 -> 1.4)
+    m_verLabel = CCLabelBMFont::create("", "bigFont.fnt");
+    m_verLabel->setScale(0.4f);
+    m_verLabel->setAnchorPoint({0.f, 0.5f});
+    m_verLabel->setPosition({24.f, 62.f});
+    m_mainLayer->addChild(m_verLabel);
+
+    auto vspr = ButtonSprite::create("Cambiar", 60, true, "bigFont.fnt", "GJ_button_02.png", 24.f, 0.5f);
+    auto vbtn = CCMenuItemSpriteExtra::create(vspr, this, menu_selector(AddPopup::onCycleVersion));
+    vbtn->setPosition({size.width - 55.f, 62.f});
+    menu->addChild(vbtn);
+    updateVerLabel();
 
     auto spr = ButtonSprite::create("Guardar", 90, true, "bigFont.fnt", "GJ_button_01.png", 28.f, 0.7f);
     auto btn = CCMenuItemSpriteExtra::create(spr, this, menu_selector(AddPopup::onSave));
@@ -157,12 +161,23 @@ bool AddPopup::init(std::function<void()> done) {
     return true;
 }
 
+void AddPopup::updateVerLabel() {
+    std::string t = "Servidor: " + gc::versionLabel(m_ver);
+    if (m_ver != 22) t += " (experimental)";
+    m_verLabel->setString(t.c_str());
+}
+
+void AddPopup::onCycleVersion(CCObject*) {
+    m_ver = m_ver == 22 ? 19 : (m_ver == 19 ? 14 : 22);
+    updateVerLabel();
+}
+
 void AddPopup::onSave(CCObject*) {
     GdpsServer s;
     s.name = m_name->getString();
     s.url = m_url->getString();
     s.dashboard = m_dash->getString();
-    s.legacy19 = m_legacy->isToggled();
+    s.gameVersion = m_ver;
     if (s.name.empty() || s.url.empty()) {
         FLAlertLayer::create("GDPS Connect", "Pon al menos un nombre y la URL.", "OK")->show();
         return;
@@ -173,6 +188,10 @@ void AddPopup::onSave(CCObject*) {
 }
 
 // ---------------------------------------------------------------- ConnectPopup
+
+static bool endsWith(std::string const& s, std::string const& suf) {
+    return s.size() >= suf.size() && s.compare(s.size() - suf.size(), suf.size(), suf) == 0;
+}
 
 ConnectPopup* ConnectPopup::create() {
     auto ret = new ConnectPopup();
@@ -205,6 +224,12 @@ bool ConnectPopup::init() {
     m_scroll->setPosition({20.f, 65.f});
     m_mainLayer->addChild(m_scroll);
 
+    // linea de diagnostico: URL activa y peticiones redirigidas
+    m_info = CCLabelBMFont::create("", "chatFont.fnt");
+    m_info->setScale(0.5f);
+    m_info->setPosition({size.width / 2, 56.f});
+    m_mainLayer->addChild(m_info);
+
     auto menu = CCMenu::create();
     menu->setPosition({0.f, 0.f});
     m_mainLayer->addChild(menu);
@@ -212,15 +237,26 @@ bool ConnectPopup::init() {
     auto mk = [&](char const* text, int w, SEL_MenuHandler h, float x) {
         auto spr = ButtonSprite::create(text, w, true, "bigFont.fnt", "GJ_button_01.png", 28.f, 0.6f);
         auto b = CCMenuItemSpriteExtra::create(spr, this, h);
-        b->setPosition({x, 34.f});
+        b->setPosition({x, 30.f});
         menu->addChild(b);
     };
     mk("Anadir", 70, menu_selector(ConnectPopup::onAdd), 75.f);
     mk("Importar", 80, menu_selector(ConnectPopup::onImport), 190.f);
     mk("Oficial", 70, menu_selector(ConnectPopup::onOfficial), 305.f);
 
+    this->schedule(schedule_selector(ConnectPopup::updateStatus), 1.f);
     refresh();
     return true;
+}
+
+void ConnectPopup::updateStatus(float) {
+    if (!m_info) return;
+    if (gc::isActive()) {
+        std::string t = gc::active().url + "  |  redirigidas: " + std::to_string(gc::redirectCount());
+        m_info->setString(t.c_str());
+    } else {
+        m_info->setString("Sin redireccion (servidores de RobTop)");
+    }
 }
 
 void ConnectPopup::refresh() {
@@ -239,7 +275,9 @@ void ConnectPopup::refresh() {
         float y = h - rowH / 2 - i * rowH;
         auto& s = m_servers[i];
 
-        auto lbl = CCLabelBMFont::create(s.name.c_str(), "bigFont.fnt");
+        std::string rowName = s.name;
+        if (s.gameVersion != 22) rowName += " [" + gc::versionLabel(s.gameVersion) + "]";
+        auto lbl = CCLabelBMFont::create(rowName.c_str(), "bigFont.fnt");
         lbl->setAnchorPoint({0.f, 0.5f});
         lbl->limitLabelWidth(110.f, 0.45f, 0.15f);
         lbl->setPosition({8.f, y});
@@ -263,34 +301,59 @@ void ConnectPopup::refresh() {
         add("X", 24, menu_selector(ConnectPopup::onDelete), 308.f, "GJ_button_06.png");
     }
     m_scroll->moveToTop();
+    updateStatus(0.f);
 }
 
 void ConnectPopup::doConnect(GdpsServer const& s) {
+    gc::addServer(s);   // guarda la URL que si funciono
     gc::setActive(s);
-    Notification::create("Conectado a " + s.name, NotificationIcon::Success)->show();
     refresh();
+    createQuickPopup("GDPS Connect",
+        "Conectado a <cy>" + s.name + "</c>.\nReinicia el juego para que todo cargue bien.",
+        "Mas tarde", "Reiniciar",
+        [](FLAlertLayer*, bool restart) { if (restart) game::restart(); });
 }
 
+// Prueba la URL tal cual y, si falla, con "/database" al final.
 void ConnectPopup::onConnect(CCObject* sender) {
     size_t i = sender->getTag();
     if (i >= m_servers.size()) return;
     GdpsServer s = m_servers[i];
 
-    // Comprueba que el servidor responda antes de cambiar
+    std::vector<std::string> candidates = {s.url};
+    if (!endsWith(s.url, "/database")) candidates.push_back(s.url + "/database");
+
     Notification::create("Comprobando " + s.name + "...", NotificationIcon::Loading, 1.5f)->show();
-    std::string gvs = s.legacy19 ? "19" : "22";
-    m_checkListener.spawn(
-        gc::post(s, "getGJLevels21.php",
+    probe(s, candidates, 0);
+}
+
+void ConnectPopup::probe(GdpsServer s, std::vector<std::string> candidates, size_t idx) {
+    GdpsServer test = s;
+    test.url = candidates[idx];
+    std::string gvs = std::to_string(s.gameVersion);
+
+    async::spawn(
+        gc::post(test, "getGJLevels21.php",
             "gameVersion=" + gvs + "&binaryVersion=45&type=4&str=&diff=-&len=-&page=0&total=0&secret=Wmfd2893gb7"),
-        [this, s](web::WebResponse res) {
-            if (res.ok()) {
-                doConnect(s);
-            } else {
-                createQuickPopup("Sin respuesta",
-                    "El servidor no respondio bien (HTTP " + std::to_string(res.code()) + ").\n<cy>Conectar igualmente?</c>",
-                    "Cancelar", "Conectar",
-                    [this, s](FLAlertLayer*, bool yes) { if (yes) doConnect(s); });
+        [self = Ref<ConnectPopup>(this), s, candidates, idx](web::WebResponse res) {
+            std::string body = res.string().unwrapOr("");
+            // respuesta valida de GDPS: HTTP 200 y que no sea una pagina HTML
+            bool good = res.ok() && !body.empty() && body[0] != '<';
+            if (good) {
+                GdpsServer ok = s;
+                ok.url = candidates[idx];
+                self->doConnect(ok);
+                return;
             }
+            if (idx + 1 < candidates.size()) {
+                self->probe(s, candidates, idx + 1);
+                return;
+            }
+            createQuickPopup("Sin respuesta",
+                "No pude hablar con <cy>" + candidates[0] + "</c> (HTTP " + std::to_string(res.code()) +
+                ").\nRevisa que la URL sea la carpeta donde esta <cy>getGJLevels21.php</c>.\n<cy>Conectar igualmente?</c>",
+                "Cancelar", "Conectar",
+                [self, s](FLAlertLayer*, bool yes) { if (yes) self->doConnect(s); });
         });
 }
 
@@ -326,13 +389,17 @@ void ConnectPopup::onImport(CCObject*) {
     auto parts = gc::split(text, '|');
     if (parts.size() < 2 || parts[0].empty() || parts[1].empty()) {
         FLAlertLayer::create("Importar",
-            "Copia un texto con este formato:\n<cy>nombre|url|dashboard</c>\n(el dashboard es opcional)", "OK")->show();
+            "Copia un texto con este formato:\n<cy>nombre|url|dashboard|version</c>\n(dashboard y version son opcionales; version: 2.2, 1.9 o 1.4)", "OK")->show();
         return;
     }
     GdpsServer s;
     s.name = parts[0];
     s.url = parts[1];
     if (parts.size() > 2) s.dashboard = parts[2];
+    if (parts.size() > 3) {
+        int v = gc::parseVersion(parts[3]);
+        if (v) s.gameVersion = v;
+    }
     gc::addServer(s);
     Notification::create("Importado: " + s.name, NotificationIcon::Success)->show();
     refresh();
