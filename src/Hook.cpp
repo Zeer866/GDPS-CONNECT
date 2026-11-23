@@ -19,8 +19,9 @@ class $modify(GCHttpClient, CCHttpClient) {
             if (gc::rewriteUrl(url, out)) {
                 req->setUrl(out.c_str());
 
-                // Modo compatibilidad 1.9: anuncia gameVersion=19
-                if (gc::active().legacy19) {
+                // Modo compatibilidad (1.9 / 1.4): anuncia otro gameVersion al servidor
+                int gv = gc::active().gameVersion;
+                if (gv != 22) {
                     auto data = req->getRequestData();
                     auto size = req->getRequestDataSize();
                     if (data && size > 0) {
@@ -28,7 +29,7 @@ class $modify(GCHttpClient, CCHttpClient) {
                         std::string from = "gameVersion=22";
                         auto pos = body.find(from);
                         if (pos != std::string::npos) {
-                            body.replace(pos, from.size(), "gameVersion=19");
+                            body.replace(pos, from.size(), "gameVersion=" + std::to_string(gv));
                             req->setRequestData(body.c_str(), body.size());
                         }
                     }
