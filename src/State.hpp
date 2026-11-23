@@ -8,7 +8,7 @@ struct GdpsServer {
     std::string name;
     std::string url;        // carpeta donde estan los .php, sin "/" final
     std::string dashboard;  // opcional
-    bool legacy19 = false;  // modo compatibilidad 1.9
+    int gameVersion = 22;   // 22 = normal, 19 = GDPS 1.9, 14 = GDPS 1.4 (experimental)
 };
 
 namespace gc {
@@ -19,6 +19,8 @@ namespace gc {
 
     std::string normalizeUrl(std::string url);
     std::string dashboardUrl(GdpsServer const& s);
+    std::string versionLabel(int gameVersion);     // "2.2", "1.9", "1.4"
+    int parseVersion(std::string const& text);      // "1.4" / "14" -> 14 (0 si no es valida)
     std::vector<std::string> split(std::string const& s, char sep);
 
     void restore();                       // al abrir el juego
@@ -30,6 +32,7 @@ namespace gc {
 
     // reescribe URLs oficiales -> servidor activo
     bool rewriteUrl(std::string const& in, std::string& out);
+    int redirectCount();   // cuantas peticiones se han redirigido (diagnostico)
 
     geode::utils::web::WebFuture post(GdpsServer const& s, std::string const& endpoint, std::string const& body);
 }
